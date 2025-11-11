@@ -1,5 +1,7 @@
 import re
+import httpx
 import asyncio
+from groq import Groq, Client
 from langchain_groq import ChatGroq
 from langgraph.types import Send
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, BaseMessage, ToolMessage
@@ -11,7 +13,14 @@ from backend.utils.logger import get_logger
 import backend.tools.web_automation_tools as tools
 from backend.db.crud import AutomationRun, AutomationTool, create_run, create_tool, update_run_status, update_tool_status
 
+# _orig_request = httpx.request
+# def _unsafe_request(*args, **kwargs):
+#     kwargs.setdefault("verify", False)
+#     return _orig_request(*args, **kwargs)
+# httpx.request = _unsafe_request
+
 logger = get_logger(__name__)
+
 
 llm_chat = ChatGroq(
     model=settings.GROQ_MODEL,
@@ -190,8 +199,8 @@ async def route_messages(state: ChatBotState) -> ChatBotState:
                 run = await create_run(last_message)
                 state["automation_run_id"] = run.id
         
-        logger.info(f"USER GOAL IS SET: {state["user_goal"]}")
-        logger.info(f"LOOP COUNT RESET: {state["loop_count"]}")
+        logger.info(f"USER GOAL IS SET: {state['user_goal']}")
+        logger.info(f"LOOP COUNT RESET: {state['loop_count']}")
 
     automation_keywords = [
         "click", "open", "go to", "navigate", "type", "fill", "select",
@@ -280,9 +289,9 @@ async def should_continue(state: ChatBotState) -> Send:
         Determine whether the agent should continue reasoing after a tool execution.
         Stops when tool results indicate success or if loop count exceeds safety threshold
     """
-    logger.info(f"LOOP COUNT GET: {state.get("loop_count", 0)}")
+    logger.info(f"LOOP COUNT GET: {state.get('loop_count', 0)}")
     state["loop_count"] = state.get("loop_count", 0) + 1
-    logger.warning(f"LOOP COUNT IS: {state["loop_count"]}")
+    logger.warning(f"LOOP COUNT IS: {state['loop_count']}")
     if state["loop_count"] > tools.CURRENT_SETTINGS.loop_limit:
         logger.warning("Loop limit reached. Ending graph execution.")
         return Send("finalize_run", state)
